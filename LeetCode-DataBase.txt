@@ -1,0 +1,191 @@
+175.
+SELECT FirstName, LastName, City, State FROM Person 
+LEFT JOIN Address USING(PersonId) ; # USING(PersonId) 可換 ON Person.PersonId = Address.PersonId
+
+
+176.
+SELECT # 子查詢是單一數字 空集合可以輸出 NULL
+    (SELECT DISTINCT Salary FROM Employee
+    ORDER BY Salary DESC LIMIT 1 OFFSET 1) AS SecondHighestSalary ;
+
+
+178.
+A. 一次 速度超快
+SELECT Score, COUNT(*) Rank 
+FROM Scores, (SELECT DISTINCT Score Sc FROM Scores) tmp 
+WHERE Score <= Sc 
+GROUP BY Id 
+ORDER BY Score DESC ;
+
+B.
+SELECT A.Score, SUM(CASE WHEN B.Score >= A.Score THEN 1 END) Rank FROM Scores A, 
+    (SELECT DISTINCT Score FROM Scores) B
+GROUP BY A.id ORDER BY A.Score DESC ;
+
+
+180.
+A.
+SELECT DISTINCT L.Num ConsecutiveNums FROM Logs L
+JOIN (SELECT Id+1 Id, Num FROM Logs) L1 USING(Id)
+JOIN (SELECT Id+2 Id, Num FROM Logs) L2 USING(Id)
+WHERE L.Num = L1.Num AND L.Num = L2.Num ;
+
+B.
+SELECT DISTINCT L.Num ConsecutiveNums FROM Logs L, Logs L1, Logs L2
+WHERE L.Id = L1.Id+1 
+AND L.Id = L2.Id+2
+AND L.Num = L1.Num 
+AND L.Num = L2.Num ;
+
+181.
+A.
+SELECT E1.Name Employee 
+FROM Employee E1, Employee E2
+WHERE E1.ManagerId = E2.Id
+AND E1.Salary > E2.Salary
+
+B.
+SELECT A.Name FROM Employee A
+JOIN Employee B ON A.Id = B.ManagerId # 直接整合同一個表
+WHERE A.Salary > B.Salary
+
+
+182.
+SELECT Email FROM
+    (SELECT Email, COUNT(Email) num FROM Person GROUP BY Email) tmp
+WHERE num > 1 ;
+
+
+183.
+SELECT Name AS Customers FROM Customers
+WHERE Id NOT IN (SELECT CustomerId FROM Orders) ; # 一維資料 不用 AS tmp (暫時表)
+
+
+184.
+A.
+SELECT D.Name Department, E.Name Employee, Salary FROM Employee E,
+    (SELECT DepartmentId, MAX(Salary) MaxS FROM Employee GROUP BY DepartmentId) tmp
+JOIN Department D ON (DepartmentId = D.Id) 
+WHERE Salary = MaxS
+AND E.DepartmentId = tmp.DepartmentId;
+
+B. 樓上雷同
+SELECT D.Name Department, E.Name Employee, Salary 
+FROM Employee E, Department D, 
+    (SELECT MAX(Salary) MaxS, DepartmentId DId FROM Employee GROUP BY DId) tmp 
+WHERE DId = D.Id 
+AND E.DepartmentId = DId 
+AND MaxS = Salary;
+
+
+185.
+A.
+SELECT D.Name Department, E.Name Employee, E.Salary FROM Employee E, Department D, 
+    (SELECT e1.Id, SUM(e1.Salary<e2.Salary) rank, DepartmentId FROM Employee e1
+     JOIN 
+        (SELECT DISTINCT Salary, DepartmentId  FROM Employee) e2 
+     USING(DepartmentId)
+     GROUP BY e1.Id) tmp 
+WHERE D.Id = E.DepartmentId AND rank < 3 AND tmp.Id = E.Id ORDER BY Department, Salary DESC ;
+
+B.
+SELECT D.Name Department, E1.Name Employee, E1.Salary FROM Employee E1, Department D,
+	(SELECT DISTINCT Salary, DepartmentId FROM Employee) E2 
+WHERE E1.DepartmentId = E2.DepartmentId 
+AND E1.DepartmentId = D.Id 
+GROUP BY E1.Id 
+HAVING SUM(E1.Salary<E2.Salary)<3 # HAVING: GROUP BY 後面的 WHERE  
+ORDER BY Department, Salary DESC ;
+
+C.
+SELECT D.Name Department, tmp2.Name Employee, Salary 
+FROM Department D, 
+    (SELECT Name, Salary, Did, SUM(Salary <= S) R FROM Employee E JOIN 
+        (SELECT DISTINCT Salary S, DepartmentId DId FROM Employee) tmp 
+    ON (DepartmentId = Did) 
+    GROUP BY Id
+    HAVING R<4
+    ORDER BY Did, R)tmp2 
+WHERE Did = D.id ;
+
+
+196.
+A.
+DELETE FROM Person
+WHERE Id NOT IN (SELECT MIN(Id) FROM (SELECT * FROM Person) tmp GROUP BY Email) ; # delete 需要創 tmp (暫時表), 要刪除的TABLE不能共存
+
+B.
+DELETE FROM Person
+WHERE Id NOT IN (SELECT * FROM (SELECT MIN(Id) FROM Person GROUP BY Email) tmp) ; # delete 需要創 tmp (暫時表), 要刪除的TABLE不能共存
+
+C.
+DELETE P1 FROM Person P1, Person P2
+WHERE P1.Email = P2.Email AND P1.ID >P2.ID ;
+
+
+197.
+SELECT Id FROM Weather,
+    (SELECT ADDDATE(RecordDate, 1) AS yes_Date , Temperature AS yes_tmp FROM Weather) AS tmp
+WHERE RecordDate = yes_Date
+AND yes_tmp <  Temperature ;
+
+
+595.
+SELECT name, population, area
+FROM World
+WHERE population > 25000000 OR area > 3000000 ;
+
+
+596.
+A. # 先把重複的同人同課刪除
+SELECT class FROM
+    (SELECT class, COUNT(class) AS num FROM
+        (SELECT DISTINCT * FROM courses) AS tmp1
+     GROUP BY class) AS tmp2
+WHERE num >= 5 ;
+
+B.
+SELECT  class
+FROM (SELECT COUNT(*) NUM, class FROM (SELECT DISTINCT * FROM courses) T GROUP BY class) tmp
+WHERE NUM >= 5
+
+
+620.
+SELECT * FROM cinema
+WHERE description != 'boring' AND id % 2 = 1 # odd 奇數
+ORDER BY rating DESC ; # DESC big -> small
+
+
+626.
+A. # 處理最大奇數問題
+SELECT IF(new_id>(SELECT COUNT(*) FROM seat), new_id-1 ,new_id) id, student FROM
+    (SELECT IF(id%2=0, id-1, id+1) new_id, student FROM seat ORDER BY new_id) tmp; # 互換ID後
+
+B. # CASE 判斷最大id 是否為奇數？ 
+SELECT 
+CASE WHEN id = (SELECT MAX(id) FROM seat) AND id % 2 = 1 THEN id # MAX(id) 要單獨提取！
+ELSE IF(id%2=1, id+1, id-1)
+END id, student
+FROM seat 
+ORDER BY id ASC;
+
+
+627.
+A. # IF(bool, T, F)
+UPDATE salary
+SET sex = IF(sex='m', 'f', 'm') ;
+
+B. # CASE COLUMN 'WHEN' A 'THEN' a 'WHEN' B 'THEN' b 'ELSE' c 'END'
+UPDATE Salary
+SET sex = CASE sex WHEN 'm' THEN 'f'
+                   ELSE 'm'
+                   END ;
+
+
+
+
+
+
+
+
+
